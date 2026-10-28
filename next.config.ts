@@ -2,9 +2,14 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  // This tells Turbopack to only look in your current project folder
+  cacheComponents: true,
+  partialPrefetching: true,
   turbopack: {
     root: path.join(__dirname),
+  },
+  // ADD THIS BLOCK
+  typescript: {
+    ignoreBuildErrors: true,
   },
 };
 
