@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import DeleteUserButton from '@/components/DeleteUserButton'
 
-export const dynamic = 'force-dynamic'
 
 // Server Action to create a new user
 async function createUser(formData: FormData) {
