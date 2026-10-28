@@ -1,0 +1,208 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
+
+async function updateIncident(formData: FormData) {
+  'use server'
+  
+  const supabase = await createClient()
+  const id = formData.get('id') as string
+  
+  // Fetch the current logged-in user to track who updated it
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // 1. Check if a NEW image was uploaded
+  const imageFile = formData.get('image') as File | null;
+  let imagePath = formData.get('existing_image') as string | null; 
+
+  if (imageFile && imageFile.size > 0) {
+    const fileExt = imageFile.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('incident-images')
+      .upload(fileName, imageFile);
+
+    if (!uploadError) {
+      imagePath = fileName;
+    }
+  }
+
+  // 2. Update the database
+  const incidentData = {
+    case_no: formData.get('case_no') as string,
+    incident_type_id: formData.get('incident_type_id') as string,
+    station_id: formData.get('station_id') as string,
+    date_of_incident: formData.get('date_of_incident') as string,
+    time_of_incident: formData.get('time_of_incident') as string || null,
+    location: formData.get('location') as string,
+    latitude: formData.get('latitude') ? Number(formData.get('latitude')) : null,
+    longitude: formData.get('longitude') ? Number(formData.get('longitude')) : null,
+    vessel_details: formData.get('vessel_details') as string,
+    persons_involved: Number(formData.get('persons_involved')) || 0,
+    confiscated_items: formData.get('confiscated_items') as string,
+    estimated_value: Number(formData.get('estimated_value')) || 0,
+    gdrive_link: formData.get('gdrive_link') as string || null,
+    image_url: imagePath,
+    remarks: formData.get('remarks') as string,
+    status: formData.get('status') as string,
+    updated_by: user?.id, // Now 'user' is defined!
+  }
+
+  const { error } = await supabase.from('incidents').update(incidentData).eq('id', id)
+
+  if (error) {
+    console.error("Database update error:", error)
+    return redirect(`/dashboard/incidents/${id}/edit?error=true`)
+  }
+
+  redirect(`/dashboard/incidents/${id}`)
+}
+
+export default async function EditIncidentPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
+  const supabase = await createClient()
+
+  const { data: incident } = await supabase.from('incidents').select('*').eq('id', resolvedParams.id).single()
+  
+  if (!incident) return notFound()
+
+  const { data: types } = await supabase.from('incident_types').select('*').order('name')
+  const { data: stations } = await supabase.from('stations').select('*').order('name')
+  const { data: personnelList } = await supabase.from('personnel').select('*').order('last_name')
+
+  return (
+    <div className="max-w-4xl mx-auto pb-10">
+      <div className="mb-6">
+        <Link href={`/dashboard/incidents/${incident.id}`} className="text-blue-600 hover:underline text-sm mb-2 inline-block font-medium">
+          ← Back to Case Details
+        </Link>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Edit Incident: {incident.case_no}</h1>
+      </div>
+
+      <div className="bg-white p-6 md:p-8 rounded-lg shadow border border-gray-100">
+        <form action={updateIncident} className="space-y-6">
+          
+          <input type="hidden" name="id" value={incident.id} />
+          <input type="hidden" name="existing_image" value={incident.image_url || ''} />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Case Number *</label>
+              <input type="text" name="case_no" required defaultValue={incident.case_no} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Date of Incident *</label>
+              <input type="date" name="date_of_incident" required defaultValue={incident.date_of_incident} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Incident Category *</label>
+              <select name="incident_type_id" required defaultValue={incident.incident_type_id} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white">
+                {types?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Station Involved *</label>
+              <select name="station_id" required defaultValue={incident.station_id} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white">
+                {stations?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned Investigating Officer</label>
+              <select name="investigating_officer_id" defaultValue={incident.investigating_officer_id || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white">
+                <option value="">Select personnel...</option>
+                {personnelList?.map(p => (
+                  <option key={p.id} value={p.id}>{p.rank} {p.first_name} {p.last_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Location Details *</label>
+              <input type="text" name="location" required defaultValue={incident.location} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Optional)</label>
+              <input type="time" name="time_of_incident" defaultValue={incident.time_of_incident || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-4 rounded-md border border-blue-100">
+            <div>
+              <label className="block text-sm font-semibold text-blue-900 mb-1">Exact Latitude (Optional)</label>
+              <input type="number" step="any" name="latitude" defaultValue={incident.latitude || ''} className="w-full px-4 py-2 border border-blue-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-blue-900 mb-1">Exact Longitude (Optional)</label>
+              <input type="number" step="any" name="longitude" defaultValue={incident.longitude || ''} className="w-full px-4 py-2 border border-blue-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Vessel Details</label>
+            <input type="text" name="vessel_details" defaultValue={incident.vessel_details || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Persons Involved</label>
+              <input type="number" name="persons_involved" min="0" defaultValue={incident.persons_involved} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Confiscated Items</label>
+              <input type="text" name="confiscated_items" defaultValue={incident.confiscated_items || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Value (PHP)</label>
+              <input type="number" name="estimated_value" step="0.01" min="0" defaultValue={incident.estimated_value} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Case Status *</label>
+              <select name="status" required defaultValue={incident.status} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white">
+                <option value="Under Investigation">Under Investigation</option>
+                <option value="In Prosecution">In Prosecution</option>
+                <option value="Charged / Filed">Charged / Filed</option>
+                <option value="Settled">Settled</option>
+                <option value="Dismissed">Dismissed</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Google Drive Link</label>
+              <input type="url" name="gdrive_link" defaultValue={incident.gdrive_link || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+            </div>
+          </div>
+
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Replace Incident Photo (Optional)</label>
+            <input type="file" name="image" accept="image/*" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#0b2d6b] file:text-white hover:file:bg-blue-800" />
+            <p className="text-xs text-gray-400 mt-2">Leave blank to keep the current image.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Remarks / Narrative</label>
+            <textarea name="remarks" rows={4} defaultValue={incident.remarks || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none"></textarea>
+          </div>
+
+          <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
+            <Link href={`/dashboard/incidents/${incident.id}`} className="px-6 py-2.5 text-gray-600 font-semibold hover:bg-gray-100 rounded-md transition">Cancel</Link>
+            <button type="submit" className="bg-[#0b2d6b] text-white font-bold px-8 py-2.5 rounded-md hover:bg-blue-800 transition shadow-md">UPDATE RECORD</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
