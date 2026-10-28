@@ -11,9 +11,17 @@ export default function LogoutButton() {
 
   const handleLogout = async () => {
     setIsLoading(true);
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh(); 
+    try {
+      // Attempt to sign out from the server
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Catch the 403 error if the token is already invalid
+      console.error("Sign out error (likely already invalid session):", error);
+    } finally {
+      // FORCE redirect to login and refresh the router state
+      router.push('/login');
+      router.refresh();
+    }
   };
 
   return (

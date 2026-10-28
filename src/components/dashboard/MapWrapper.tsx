@@ -11,16 +11,27 @@ const CaseMap = dynamic(() => import('./CaseMap'), {
   )
 });
 
-// Define the type here to remove 'any'
 type MapIncident = {
   id: string;
   case_no: string;
   location: string;
   status: string;
   date_of_incident: string;
+  latitude: number | null;
+  longitude: number | null;
   incident_types: { name: string } | null;
 };
 
-export default function MapWrapper({ cases }: { cases: MapIncident[] }) {
-  return <CaseMap cases={cases} />;
+type MapOperation = {
+  id: string;
+  name: string;
+  location: string | null;
+  status: string;
+  date: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export default function MapWrapper({ cases, operations }: { cases: MapIncident[], operations: MapOperation[] }) {
+  return <CaseMap cases={cases} operations={operations} />;
 }

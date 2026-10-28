@@ -12,6 +12,7 @@ type DashboardIncident = {
   date_of_incident: string;
   case_no: string;
   location: string;
+  persons_involved: number;
   incident_types: { name: string } | null;
 };
 
@@ -41,48 +42,76 @@ export default async function DashboardPage() {
     }
   }
 
-  // --- NEW: Calculate Date Ranges for Trends ---
+  // --- CALCULATE DATE RANGES FOR TRENDS ---
   const now = new Date();
   const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
   const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
 
-  // 1. Total Counts
-  const { count: totalOps } = await supabase.from('operations').select('*', { count: 'exact', head: true })
-  const { count: totalIncidents } = await supabase.from('incidents').select('*', { count: 'exact', head: true })
-  const { count: courtProceedings } = await supabase.from('court_proceedings').select('*', { count: 'exact', head: true })
-  const { count: finalDispositions } = await supabase.from('incidents').select('*', { count: 'exact', head: true }).in('status', ['Settled', 'Charged / Filed'])
+  // --- FETCH ALL DATA IN PARALLEL ---
+  const [
+    { count: totalOps },
+    { count: opsThisMonth },
+    { count: opsLastMonth },
+    { count: totalIncidents },
+    { count: incidentsThisMonth },
+    { count: incidentsLastMonth },
+    { count: activePersonnel },          
+    { count: activePersonsCompanies },   
+    { count: courtThisMonth },
+    { count: courtLastMonth },
+    { count: dispositionsThisMonth },
+    { count: dispositionsLastMonth },
+    { data: allIncidents },
+    { data: allOperations } // <-- ADD THIS
+  ] = await Promise.all([
+    // Operations
+    supabase.from('operations').select('*', { count: 'exact', head: true }),
+    supabase.from('operations').select('*', { count: 'exact', head: true }).gte('date', firstDayThisMonth).lte('date', lastDayThisMonth),
+    supabase.from('operations').select('*', { count: 'exact', head: true }).gte('date', firstDayLastMonth).lte('date', lastDayLastMonth),
+    
+    // Incidents
+    supabase.from('incidents').select('*', { count: 'exact', head: true }),
+    supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('date_of_incident', firstDayThisMonth).lte('date_of_incident', lastDayThisMonth),
+    supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('date_of_incident', firstDayLastMonth).lte('date_of_incident', lastDayLastMonth),
+    
+    // Personnel (Only counts those with Status = 'Active')
+    supabase.from('personnel').select('*', { count: 'exact', head: true }).eq('status', 'Active'),
 
-  // 2. Trend: Incidents this month vs last month
-  const { count: incidentsThisMonth } = await supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('date_of_incident', firstDayThisMonth)
-  const { count: incidentsLastMonth } = await supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('date_of_incident', firstDayLastMonth).lte('date_of_incident', lastDayLastMonth)
+    // Persons/Companies (Only counts those with Status = 'Active Case')
+    supabase.from('persons_companies').select('*', { count: 'exact', head: true }).eq('status', 'Active Case'),
 
-  // 3. Trend: Operations this month vs last month
-  const { count: opsThisMonth } = await supabase.from('operations').select('*', { count: 'exact', head: true }).gte('date', firstDayThisMonth)
-  const { count: opsLastMonth } = await supabase.from('operations').select('*', { count: 'exact', head: true }).gte('date', firstDayLastMonth).lte('date', lastDayLastMonth)
+    // Court Proceedings
+    supabase.from('court_proceedings').select('*', { count: 'exact', head: true }).gte('hearing_date', firstDayThisMonth).lte('hearing_date', lastDayThisMonth),
+    supabase.from('court_proceedings').select('*', { count: 'exact', head: true }).gte('hearing_date', firstDayLastMonth).lte('hearing_date', lastDayLastMonth),
+
+    // Convictions / Final Dispositions
+    supabase.from('incidents').select('*', { count: 'exact', head: true }).in('status', ['Settled', 'Charged / Filed']).gte('date_of_incident', firstDayThisMonth).lte('date_of_incident', lastDayThisMonth),
+    supabase.from('incidents').select('*', { count: 'exact', head: true }).in('status', ['Settled', 'Charged / Filed']).gte('date_of_incident', firstDayLastMonth).lte('date_of_incident', lastDayLastMonth),
+
+    // All Incidents (for Charts, Map)
+    supabase.from('incidents').select('*, incident_types(name)'),
+    supabase.from('operations').select('*')
+  ]);
 
   // Helper function to calculate percentage
   const calculateTrend = (current: number | null, last: number | null) => {
     const cur = current || 0;
     const prev = last || 0;
-    
-    // If no data last month but we have data this month, it's a 100% increase
     if (prev === 0 && cur > 0) return "100%"; 
     if (prev === 0 && cur === 0) return "0%";
-    
     const diff = cur - prev;
     const percent = Math.round((diff / prev) * 100);
-    
-    // Format as +12% or -5%
     return `${percent > 0 ? '+' : ''}${percent}%`;
   }
 
   const opsTrend = calculateTrend(opsThisMonth, opsLastMonth);
   const incidentsTrend = calculateTrend(incidentsThisMonth, incidentsLastMonth);
+  const courtTrend = calculateTrend(courtThisMonth, courtLastMonth);
+  const dispositionsTrend = calculateTrend(dispositionsThisMonth, dispositionsLastMonth);
 
-  // Fetch All Incidents for charts and map
-  const { data: allIncidents } = await supabase.from('incidents').select('*, incident_types(name)')
-  
+  // Process Data for Charts
   const statusCounts = allIncidents?.reduce((acc: Record<string, number>, curr: DashboardIncident) => {
     acc[curr.status] = (acc[curr.status] || 0) + 1;
     return acc;
@@ -117,26 +146,27 @@ export default async function DashboardPage() {
       </div>
       
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-8">
-        {/* Pass the calculated trends here */}
         <StatCard title="Total Operations" value={totalOps || 0} trend={opsTrend} icon={Icons.Operations} iconBgColor="bg-blue-50" iconColor="text-blue-600" />
         <StatCard title="Total Incidents" value={totalIncidents || 0} trend={incidentsTrend} icon={Icons.Cases} iconBgColor="bg-red-50" iconColor="text-red-600" />
         
-        <StatCard title="Personnel Involved" value={1} trend="10%" icon={Icons.Personnel} iconBgColor="bg-green-50" iconColor="text-green-600" />
-        <StatCard title="Persons/Companies Linked" value={64} trend="6%" icon={Icons.Linked} iconBgColor="bg-yellow-50" iconColor="text-yellow-600" />
-        <StatCard title="Court Proceedings" value={courtProceedings || 0} trend="14%" icon={Icons.Court} iconBgColor="bg-purple-50" iconColor="text-purple-600" />
-        <StatCard title="Convictions / Final Disposition" value={finalDispositions || 0} trend="17%" icon={Icons.Convictions} iconBgColor="bg-teal-50" iconColor="text-teal-600" />
+        {/* Updated to use active counts */}
+        <StatCard title="Personnel Involved" value={activePersonnel || 0} trend="0%" icon={Icons.Personnel} iconBgColor="bg-green-50" iconColor="text-green-600" />
+        <StatCard title="Persons/Companies Linked" value={activePersonsCompanies || 0} trend="0%" icon={Icons.Linked} iconBgColor="bg-yellow-50" iconColor="text-yellow-600" />
+        
+        <StatCard title="Court Proceedings" value={(courtThisMonth || 0) + (courtLastMonth || 0)} trend={courtTrend} icon={Icons.Court} iconBgColor="bg-purple-50" iconColor="text-purple-600" />
+        <StatCard title="Convictions / Final Disposition" value={(dispositionsThisMonth || 0) + (dispositionsLastMonth || 0)} trend={dispositionsTrend} icon={Icons.Convictions} iconBgColor="bg-teal-50" iconColor="text-teal-600" />
       </div>
 
       <DashboardCharts statusData={statusData} violationData={violationData} />
 
-      <MapWrapper cases={allIncidents || []} />
+    <MapWrapper cases={allIncidents || []} operations={allOperations || []} />
 
       <div className="bg-white rounded-lg shadow border border-gray-100 overflow-hidden mb-8">
         <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <h2 className="text-lg font-bold text-gray-800">Recent Incidents</h2>
-          {/* FIXED: Changed <a> to <Link> */}
           <Link href="/dashboard/incidents" className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">View All Incidents →</Link>
         </div>
+        
         <div className="overflow-x-auto w-full">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -152,8 +182,8 @@ export default async function DashboardPage() {
               {recentCases?.map((c: DashboardIncident) => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:underline">
-  <Link href={`/dashboard/incidents/${c.id}`}>{c.case_no}</Link>
-</td>
+                    <Link href={`/dashboard/incidents/${c.id}`}>{c.case_no}</Link>
+                  </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.date_of_incident}</td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.incident_types?.name}</td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-[200px]">{c.location}</td>

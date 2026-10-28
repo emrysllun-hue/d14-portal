@@ -13,11 +13,14 @@ export default function SessionTimeout() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleLogout = useCallback(async () => {
-    // 1. Sign out securely from Supabase
-    await supabase.auth.signOut();
-    // 2. Redirect to login
-    router.push('/login');
-    router.refresh();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Timeout sign out error:", error);
+    } finally {
+      router.push('/login');
+      router.refresh();
+    }
   }, [router, supabase.auth]);
 
   const resetTimer = useCallback(() => {

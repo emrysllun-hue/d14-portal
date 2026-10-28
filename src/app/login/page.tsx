@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { loginAction } from './actions' // Import the Server Action
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -29,13 +30,11 @@ export default function LoginPage() {
     setError(null)
     setIsLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    // Call the Server Action instead of supabase directly
+    const result = await loginAction(email, password)
 
-    if (error) {
-      setError(error.message)
+    if (result.error) {
+      setError(result.error)
       setIsLoading(false)
     } else {
       setIsRedirecting(true)

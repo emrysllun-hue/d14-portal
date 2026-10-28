@@ -1,11 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { verifyAdmin } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 async function submitIncident(formData: FormData) {
   'use server'
+  
+  // SECURITY CHECK
+  if (!(await verifyAdmin())) {
+    throw new Error("Unauthorized: Admin access required.")
+  }
   
   const supabase = await createClient()
   
@@ -33,6 +39,7 @@ async function submitIncident(formData: FormData) {
     case_no: formData.get('case_no') as string,
     incident_type_id: formData.get('incident_type_id') as string,
     station_id: formData.get('station_id') as string,
+    operation_id: formData.get('operation_id') as string || null, 
     date_of_incident: formData.get('date_of_incident') as string,
     time_of_incident: formData.get('time_of_incident') as string || null,
     location: formData.get('location') as string,
@@ -48,12 +55,22 @@ async function submitIncident(formData: FormData) {
     status: formData.get('status') as string,
   }
 
-  // 3. Insert into database
-  const { error } = await supabase.from('incidents').insert(incidentData)
+  // 3. Insert into database and return the new row to get its ID
+  const { data: newIncident, error } = await supabase.from('incidents').insert(incidentData).select().single()
 
-  if (error) {
+  if (error || !newIncident) {
     console.error(error)
     return redirect('/dashboard/incidents/new?error=true')
+  }
+
+  // 4. Handle Linked Persons/Companies
+  const selectedPersons = formData.getAll('linked_persons') as string[];
+  if (selectedPersons.length > 0) {
+    const personLinks = selectedPersons.map(personId => ({
+      incident_id: newIncident.id,
+      person_id: personId
+    }))
+    await supabase.from('incident_persons').insert(personLinks)
   }
 
   redirect('/dashboard/incidents')
@@ -64,6 +81,10 @@ export default async function NewIncidentPage() {
 
   const { data: types } = await supabase.from('incident_types').select('*').order('name')
   const { data: stations } = await supabase.from('stations').select('*').order('name')
+  const { data: operationsList } = await supabase.from('operations').select('id, name').order('date', { ascending: false })
+  
+  // NEW: Fetch Persons/Companies for the multi-select
+  const { data: personsList } = await supabase.from('persons_companies').select('id, name, type').order('name')
 
   return (
     <div className="max-w-4xl mx-auto pb-10">
@@ -76,7 +97,6 @@ export default async function NewIncidentPage() {
       </div>
 
       <div className="bg-white p-6 md:p-8 rounded-lg shadow border border-gray-100">
-        {/* The form action is now completely clean */}
         <form action={submitIncident} className="space-y-6">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -103,6 +123,19 @@ export default async function NewIncidentPage() {
               <select name="station_id" required className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white">
                 <option value="">Select a station...</option>
                 {stations?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Linked Operation Dropdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Linked Operation (Optional)</label>
+              <select name="operation_id" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white">
+                <option value="">No Linked Operation</option>
+                {operationsList?.map(op => (
+                  <option key={op.id} value={op.id}>{op.name}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -137,7 +170,7 @@ export default async function NewIncidentPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Persons Involved</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Total Persons Involved</label>
               <input type="number" name="persons_involved" min="0" defaultValue="0" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
             </div>
             <div>
@@ -148,6 +181,17 @@ export default async function NewIncidentPage() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Value (PHP)</label>
               <input type="number" name="estimated_value" step="0.01" min="0" defaultValue="0" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
             </div>
+          </div>
+
+          {/* NEW: Linked Persons/Companies Multi-Select */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Select Individuals / Companies Involved</label>
+            <select name="linked_persons" multiple className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white h-32">
+              {personsList?.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -28,6 +28,11 @@ export default async function IncidentsPage({
   const searchFilter = params.search
   const statusFilter = params.status
 
+  // --- NEW: Fetch user role to check for Admin access ---
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+  const isAdmin = profile?.role === 'admin'
+
   // 1. Build the base query
   let query = supabase
     .from('incidents')
@@ -78,18 +83,22 @@ export default async function IncidentsPage({
               : 'View and manage all maritime law enforcement records.'}
           </p>
         </div>
-        <Link 
-          href="/dashboard/incidents/new" 
-          className="bg-[#0b2d6b] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition shadow-sm font-semibold whitespace-nowrap"
-        >
-          + Add New Incident
-        </Link>
+        
+        {/* FIXED: Only show this button if the user is an Admin */}
+        {isAdmin && (
+          <Link 
+            href="/dashboard/incidents/new" 
+            className="bg-[#0b2d6b] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition shadow-sm font-semibold whitespace-nowrap"
+          >
+            + Add New Incident
+          </Link>
+        )}
       </div>
 
-      {/* NEW: Search and Filter Component */}
+      {/* Search and Filter Component */}
       <Suspense fallback={<div className="h-10 w-full bg-gray-100 animate-pulse rounded-lg mb-6"></div>}>
-  <IncidentFilters />
-</Suspense>
+        <IncidentFilters />
+      </Suspense>
 
       {/* Data Table */}
       <div className="bg-white rounded-lg shadow border border-gray-100 overflow-hidden">

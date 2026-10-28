@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Fragment } from 'react'
+import ManualRecapEntry from '@/components/dashboard/ManualRecapEntry'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +16,18 @@ const getQuarter = (dateString: string) => {
 export default async function RecapPage() {
   const supabase = await createClient()
 
+  // 1. Check User Role
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+  const isAdmin = profile?.role === 'admin'
+
+  // 2. Fetch Data
   const { data: incidents } = await supabase.from('incidents').select(`*, incident_types (name), stations (name)`)
+  const { data: overrides } = await supabase.from('recap_overrides').select(`*, incident_types (name), stations (name)`)
   const { data: stations } = await supabase.from('stations').select('*').order('name')
   const { data: types } = await supabase.from('incident_types').select('*').order('name')
 
+  // 3. Build Matrix
   const matrix: Record<string, Record<string, Record<number, number>>> = {}
   
   stations?.forEach(station => {
@@ -28,6 +37,7 @@ export default async function RecapPage() {
     })
   })
 
+  // Populate with Real Incidents
   incidents?.forEach(inc => {
     const stationName = inc.stations?.name
     const typeName = inc.incident_types?.name
@@ -41,8 +51,23 @@ export default async function RecapPage() {
     }
   })
 
+  // Populate with Manual Overrides
+  overrides?.forEach(ovr => {
+    const stationName = ovr.stations?.name
+    const typeName = ovr.incident_types?.name
+    const q = ovr.quarter
+
+    if (stationName && typeName && q && matrix[stationName]) {
+      matrix[stationName][typeName][q] += ovr.count;
+    }
+  })
+
+  // Calculate Grand Total (Incidents + Overrides)
+  const grandTotal = Object.values(matrix).reduce((acc, stationData) => {
+    return acc + Object.values(stationData).reduce((sum, qData) => sum + Object.values(qData).reduce((a, b) => a + b, 0), 0)
+  }, 0)
+
   return (
-    // max-w-7xl mx-auto centers the page on desktop
     <div className="w-full max-w-7xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
@@ -50,26 +75,30 @@ export default async function RecapPage() {
           <p className="text-sm md:text-base text-gray-500">Quarterly Summary of Maritime Law Enforcement Activities by Station and Category.</p>
         </div>
         
-        <a 
-          href="/api/recap/export" 
-          download
-          className="bg-[#0b2d6b] text-white px-4 py-2 rounded hover:bg-blue-800 transition flex items-center gap-2 shadow-sm whitespace-nowrap"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-          </svg>
-          Export to Excel (CSV)
-        </a>
+        <div className="flex items-center gap-3">
+          {/* Render Manual Entry Button if Admin */}
+          {isAdmin && (
+          <ManualRecapEntry stations={stations || []} types={types || []} overrides={overrides || []} />
+          )}
+          
+          <a 
+            href="/api/recap/export" 
+            download
+            className="bg-[#0b2d6b] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition flex items-center gap-2 shadow-sm whitespace-nowrap"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+            Export to Excel (CSV)
+          </a>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow border border-gray-100 overflow-hidden mb-8">
-        {/* This div enables horizontal scrolling on mobile */}
         <div className="overflow-x-auto w-full">
-          {/* min-w-max ensures the table doesn't squish on small screens */}
           <table className="min-w-max w-full divide-y divide-gray-200 border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                {/* Sticky Station Column */}
                 <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase border-r border-b sticky left-0 bg-gray-100 z-10">
                   Station
                 </th>
@@ -103,7 +132,6 @@ export default async function RecapPage() {
 
                 return (
                   <tr key={station.id} className="hover:bg-blue-50 transition-colors">
-                    {/* Sticky Station name */}
                     <td className="px-4 py-2 text-sm font-bold text-gray-800 border-r bg-gray-50 sticky left-0 z-10 whitespace-nowrap">
                       {station.name}
                     </td>
@@ -141,7 +169,8 @@ export default async function RecapPage() {
                     </Fragment>
                   )
                 })}
-                <td className="px-4 py-2 text-center font-bold text-[#0b2d6b] text-lg">{incidents?.length || 0}</td>
+                {/* Render Grand Total here */}
+                <td className="px-4 py-2 text-center font-bold text-[#0b2d6b] text-lg">{grandTotal}</td>
               </tr>
 
               <tr className="bg-gray-50">

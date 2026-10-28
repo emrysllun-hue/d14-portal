@@ -27,7 +27,7 @@ const LOCATION_COORDS: Record<string, [number, number]> = {
   'Default': [12.8797, 121.7740] 
 };
 
-const getCustomIcon = (typeName: string) => {
+const getIncidentIcon = (typeName: string) => {
   let color = '#3B82F6';
   let iconHtml = '📍';
 
@@ -57,17 +57,38 @@ const getCustomIcon = (typeName: string) => {
   });
 };
 
-// Use the same type here to remove 'any'
+const getOperationIcon = () => {
+  return L.divIcon({
+    className: 'custom-icon',
+    html: `<div style="background-color: #64748B; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); font-size: 16px;">🚢</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16],
+  });
+};
+
 type MapIncident = {
   id: string;
   case_no: string;
   location: string;
   status: string;
   date_of_incident: string;
+  latitude: number | null;
+  longitude: number | null;
   incident_types: { name: string } | null;
 };
 
-export default function CaseMap({ cases }: { cases: MapIncident[] }) {
+type MapOperation = {
+  id: string;
+  name: string;
+  location: string | null;
+  status: string;
+  date: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export default function CaseMap({ cases, operations }: { cases: MapIncident[], operations: MapOperation[] }) {
   const center: [number, number] = [12.8797, 121.7740];
 
   return (
@@ -80,6 +101,7 @@ export default function CaseMap({ cases }: { cases: MapIncident[] }) {
           <span className="flex items-center gap-1 text-purple-500">💊 Drugs</span>
           <span className="flex items-center gap-1 text-green-500">🪵 Logging</span>
           <span className="flex items-center gap-1 text-amber-500">🏴‍☠️ Piracy</span>
+          <span className="flex items-center gap-1 text-slate-500 ml-4 border-l pl-4 border-gray-300">🚢 Operations</span>
         </div>
       </div>
       <div className="h-[300px] md:h-[450px] w-full z-0 relative">
@@ -89,16 +111,13 @@ export default function CaseMap({ cases }: { cases: MapIncident[] }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
+          {/* Render Incidents */}
           {cases.map((c) => {
             const typeName = c.incident_types?.name || 'Unknown';
-            const coords = LOCATION_COORDS[c.location] || LOCATION_COORDS['Default']; 
+            const coords = (c.latitude && c.longitude) ? [c.latitude, c.longitude] as [number, number] : LOCATION_COORDS[c.location] || LOCATION_COORDS['Default']; 
             
             return (
-              <Marker 
-                key={c.id} 
-                position={coords}
-                icon={getCustomIcon(typeName)}
-              >
+              <Marker key={`inc-${c.id}`} position={coords} icon={getIncidentIcon(typeName)}>
                 <Popup>
                   <div className="p-1">
                     <h3 className="font-bold text-gray-800 text-sm mb-1">{c.case_no}</h3>
@@ -113,6 +132,27 @@ export default function CaseMap({ cases }: { cases: MapIncident[] }) {
               </Marker>
             );
           })}
+
+          {/* Render Operations */}
+          {operations.map((op) => {
+            if (!op.latitude || !op.longitude) return null; // Only show operations with coordinates
+            
+            return (
+              <Marker key={`op-${op.id}`} position={[op.latitude, op.longitude]} icon={getOperationIcon()}>
+                <Popup>
+                  <div className="p-1">
+                    <h3 className="font-bold text-gray-800 text-sm mb-1">{op.name}</h3>
+                    <p className="text-xs text-gray-600 mb-1"><strong>Location:</strong> {op.location || 'N/A'}</p>
+                    <p className="text-xs text-gray-600 mb-1"><strong>Date:</strong> {op.date}</p>
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-800 text-[10px] font-bold rounded-full">
+                      {op.status}
+                    </span>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
         </MapContainer>
       </div>
     </div>

@@ -5,6 +5,18 @@ import { revalidatePath } from 'next/cache'
 
 export const dynamic = 'force-dynamic'
 
+// Define the types to fix the 'any' error
+type PersonCompany = {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+};
+
+type IncidentPersonLink = {
+  persons_companies: PersonCompany | PersonCompany[] | null;
+};
+
 // Server Action to Add a Court Proceeding
 async function addProceeding(formData: FormData) {
   'use server'
@@ -44,44 +56,70 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
   const resolvedParams = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
-  const isAdmin = profile?.role === 'admin'
-
-  // 1. Fetch the incident (Removed the complex join to prevent errors)
-  const { data: incident, error } = await supabase
-    .from('incidents')
-    .select(`*, incident_types (name), stations (name)`)
-    .eq('id', resolvedParams.id)
-    .single()
+  // --- OPTIMIZED FETCHING ---
+  // 1. Fetch User and Incident at the same time (No dependencies)
+  const [
+    { data: { user } },
+    { data: incident, error }
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('incidents')
+      .select(`*, incident_types (name), stations (name), operations (name)`)
+      .eq('id', resolvedParams.id)
+      .single()
+  ])
 
   if (error || !incident) return notFound()
 
-  // 2. Fetch the updater's profile separately if it exists
-  let updater = null;
-  if (incident.updated_by) {
-    const { data: updaterData } = await supabase
-      .from('profiles')
-      .select('rank, first_name, last_name')
-      .eq('id', incident.updated_by)
-      .single()
-    updater = updaterData;
-  }
+  // 2. Fetch all dependent data in parallel
+  const [
+    { data: profile },
+    { data: proceedings },
+    { data: updaterData },
+    { data: urlData },
+    { data: linkedPersons }
+  ] = await Promise.all([
+    // Fetch role for admin buttons
+    supabase.from('profiles').select('role').eq('id', user?.id).single(),
+    
+    // Fetch court proceedings
+    supabase
+      .from('court_proceedings')
+      .select('*')
+      .eq('incident_id', incident.id)
+      .order('hearing_date', { ascending: true }),
+    
+    // Fetch updater info (only if it exists)
+    incident.updated_by 
+      ? supabase.from('profiles').select('rank, full_name, personnel_type').eq('id', incident.updated_by).single()
+      : Promise.resolve({ data: null }),
 
-  // 3. Fetch Court Proceedings
-  const { data: proceedings } = await supabase
-    .from('court_proceedings')
-    .select('*')
-    .eq('incident_id', incident.id)
-    .order('hearing_date', { ascending: true })
+    // Generate image URL (only if it exists)
+    incident.image_url
+      ? supabase.storage.from('incident-images').createSignedUrl(incident.image_url, 3600)
+      : Promise.resolve({ data: null }),
 
-  // 4. Generate secure image URL
-  let signedImageUrl = null;
-  if (incident.image_url) {
-    const { data: urlData } = await supabase.storage
-      .from('incident-images')
-      .createSignedUrl(incident.image_url, 3600);
-    if (urlData) signedImageUrl = urlData.signedUrl;
+    // Fetch linked persons
+    supabase
+      .from('incident_persons')
+      .select('persons_companies (id, name, type, status)')
+      .eq('incident_id', incident.id)
+  ]);
+
+  const isAdmin = profile?.role === 'admin'
+  const signedImageUrl = urlData?.signedUrl || null
+
+  // Format the updater name based on PCG rules
+  let updaterName = 'Unknown User';
+  if (updaterData) {
+    const rank = updaterData.rank ? updaterData.rank.toUpperCase() : '';
+    const name = updaterData.full_name || 'User';
+    if (updaterData.personnel_type === 'Officer') {
+      updaterName = `${rank} ${name.toUpperCase()}`;
+    } else {
+      updaterName = `${rank} ${name.toLowerCase().replace(/\b\w/g, (char: string) => char.toUpperCase())}`;
+    }
   }
 
   return (
@@ -152,18 +190,58 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-4 text-sm">
             <div className="text-gray-500 font-medium">Category:</div>
             <div className="text-gray-900 font-semibold">{incident.incident_types?.name}</div>
+            
             <div className="text-gray-500 font-medium">Station:</div>
             <div className="text-gray-900 font-semibold">{incident.stations?.name}</div>
+            
+            <div className="text-gray-500 font-medium">Linked Operation:</div>
+            <div className="text-gray-900 font-semibold">
+              {incident.operations?.name ? (
+                <Link href={`/dashboard/operations/${incident.operation_id}`} className="text-blue-600 hover:underline">
+                  {incident.operations.name}
+                </Link>
+              ) : (
+                <span className="text-gray-400 italic">None</span>
+              )}
+            </div>
+
             <div className="text-gray-500 font-medium">Date & Time:</div>
             <div className="text-gray-900">{incident.date_of_incident} {incident.time_of_incident ? `at ${incident.time_of_incident}` : ''}</div>
+            
             <div className="text-gray-500 font-medium">Location:</div>
             <div className="text-gray-900">{incident.location}</div>
+            
             <div className="text-gray-500 font-medium">Vessel Details:</div>
             <div className="text-gray-900">{incident.vessel_details || 'N/A'}</div>
-            <div className="text-gray-500 font-medium">Persons Involved:</div>
+            
+            <div className="text-gray-500 font-medium">Total Persons Involved:</div>
             <div className="text-gray-900">{incident.persons_involved}</div>
+
+            {/* NEW: Linked Individuals Display (Fixed Types) */}
+            <div className="text-gray-500 font-medium">Linked Individuals:</div>
+            <div className="text-gray-900 font-semibold flex flex-col gap-1">
+              {linkedPersons && linkedPersons.length > 0 ? (
+                // FIXED: Replaced 'any' with 'IncidentPersonLink'
+                linkedPersons.map((lp: IncidentPersonLink) => {
+                  // Supabase returns this as an array sometimes, so we extract the first item
+                  const person = Array.isArray(lp.persons_companies) ? lp.persons_companies[0] : lp.persons_companies;
+                  
+                  if (!person) return null;
+                  
+                  return (
+                    <Link href={`/dashboard/persons`} key={person.id} className="text-blue-600 hover:underline">
+                      {person.name} ({person.type})
+                    </Link>
+                  );
+                })
+              ) : (
+                <span className="text-gray-400 italic font-normal">No specific individuals linked</span>
+              )}
+            </div>
+
             <div className="text-gray-500 font-medium">Confiscated Items:</div>
             <div className="text-gray-900">{incident.confiscated_items || 'N/A'}</div>
+            
             <div className="text-gray-500 font-medium">Estimated Value:</div>
             <div className="font-bold text-green-700">₱{Number(incident.estimated_value).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
           </div>
@@ -172,12 +250,10 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{incident.remarks || 'No remarks provided.'}</p>
           
           {/* AUDIT TRAIL FOOTER */}
-          {incident.updated_by && updater && (
+          {incident.updated_at && (
             <div className="mt-8 pt-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs text-gray-400 italic">
               <span>
-                Last updated by: <strong className="text-gray-600">
-                  {updater.rank} {updater.first_name} {updater.last_name}
-                </strong>
+                Last updated by: <strong className="text-gray-600">{updaterName}</strong>
               </span>
               <span>
                 {new Date(incident.updated_at).toLocaleString('en-PH', {
