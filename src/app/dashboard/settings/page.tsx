@@ -3,7 +3,6 @@ import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-export const dynamic = 'force-dynamic'
 
 // Define a proper type to fix the 'any' errors
 type ListItem = {
