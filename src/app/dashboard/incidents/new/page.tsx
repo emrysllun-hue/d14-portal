@@ -3,8 +3,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { verifyAdmin } from '@/lib/auth'
 
-
-
 async function submitIncident(formData: FormData) {
   'use server'
   
@@ -34,13 +32,47 @@ async function submitIncident(formData: FormData) {
     }
   }
 
-  // 2. Extract all other form data
+  // 2. Handle Auto-Generated Case Number
+  let caseNo = formData.get('case_no') as string;
+  const typeId = formData.get('incident_type_id') as string;
+  const incidentDate = formData.get('date_of_incident') as string;
+
+  if (!caseNo || caseNo.trim() === '') {
+    const { data: typeData } = await supabase.from('incident_types').select('name').eq('id', typeId).single();
+    const catName = typeData?.name ? typeData.name.replace(/\s+/g, '-').toUpperCase() : 'INCIDENT';
+
+    const dateObj = new Date(incidentDate);
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const year = dateObj.getFullYear();
+    const prefix = `${catName}-${month}-${year}-`;
+
+    const { data: latestInc } = await supabase
+      .from('incidents')
+      .select('case_no')
+      .ilike('case_no', `${prefix}%`)
+      .order('case_no', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let nextNum = 1;
+    if (latestInc && latestInc.case_no) {
+      const parts = latestInc.case_no.split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastNum)) nextNum = lastNum + 1;
+    }
+    
+    caseNo = `${prefix}${String(nextNum).padStart(3, '0')}`;
+  }
+
+  // 3. Extract all other form data (Using manual text inputs)
   const incidentData = {
-    case_no: formData.get('case_no') as string,
-    incident_type_id: formData.get('incident_type_id') as string,
+    case_no: caseNo,
+    incident_type_id: typeId,
     station_id: formData.get('station_id') as string,
     operation_id: formData.get('operation_id') as string || null, 
-    date_of_incident: formData.get('date_of_incident') as string,
+    investigating_officer_name: formData.get('investigating_officer_name') as string || null, // <-- Manual text
+    linked_persons_names: formData.get('linked_persons_names') as string || null,             // <-- Manual text
+    date_of_incident: incidentDate,
     time_of_incident: formData.get('time_of_incident') as string || null,
     location: formData.get('location') as string,
     latitude: formData.get('latitude') ? Number(formData.get('latitude')) : null,
@@ -55,22 +87,12 @@ async function submitIncident(formData: FormData) {
     status: formData.get('status') as string,
   }
 
-  // 3. Insert into database and return the new row to get its ID
+  // 4. Insert into database
   const { data: newIncident, error } = await supabase.from('incidents').insert(incidentData).select().single()
 
   if (error || !newIncident) {
     console.error(error)
     return redirect('/dashboard/incidents/new?error=true')
-  }
-
-  // 4. Handle Linked Persons/Companies
-  const selectedPersons = formData.getAll('linked_persons') as string[];
-  if (selectedPersons.length > 0) {
-    const personLinks = selectedPersons.map(personId => ({
-      incident_id: newIncident.id,
-      person_id: personId
-    }))
-    await supabase.from('incident_persons').insert(personLinks)
   }
 
   redirect('/dashboard/incidents')
@@ -82,9 +104,6 @@ export default async function NewIncidentPage() {
   const { data: types } = await supabase.from('incident_types').select('*').order('name')
   const { data: stations } = await supabase.from('stations').select('*').order('name')
   const { data: operationsList } = await supabase.from('operations').select('id, name').order('date', { ascending: false })
-  
-  // NEW: Fetch Persons/Companies for the multi-select
-  const { data: personsList } = await supabase.from('persons_companies').select('id, name, type').order('name')
 
   return (
     <div className="max-w-4xl mx-auto pb-10">
@@ -101,8 +120,8 @@ export default async function NewIncidentPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Case Number *</label>
-              <input type="text" name="case_no" required placeholder="e.g., MSL-2026-F01" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Case Number</label>
+              <input type="text" name="case_no" placeholder="Leave blank for auto-generation" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Date of Incident *</label>
@@ -127,7 +146,6 @@ export default async function NewIncidentPage() {
             </div>
           </div>
 
-          {/* Linked Operation Dropdown */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Linked Operation (Optional)</label>
@@ -146,8 +164,15 @@ export default async function NewIncidentPage() {
               <input type="text" name="location" required placeholder="e.g., Vicinity waters of Sablayan" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Optional)</label>
-              <input type="time" name="time_of_incident" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Optional - HH:mm)</label>
+              <input 
+                type="text" 
+                name="time_of_incident" 
+                placeholder="e.g., 14:30"
+                pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                title="Please enter time in 24-hour format (e.g., 14:30)"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" 
+              />
             </div>
           </div>
 
@@ -160,7 +185,6 @@ export default async function NewIncidentPage() {
               <label className="block text-sm font-semibold text-blue-900 mb-1">Exact Longitude (Optional)</label>
               <input type="number" step="any" name="longitude" placeholder="e.g., 120.7711" className="w-full px-4 py-2 border border-blue-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
-            <p className="text-xs text-blue-700 md:col-span-2">If provided, this pin will override the text location on the Operational Map.</p>
           </div>
 
           <div>
@@ -183,15 +207,26 @@ export default async function NewIncidentPage() {
             </div>
           </div>
 
-          {/* NEW: Linked Persons/Companies Multi-Select */}
+          {/* NEW: ASSIGNED INVESTIGATING OFFICER (Manual Text Input) */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Select Individuals / Companies Involved</label>
-            <select name="linked_persons" multiple className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none bg-white h-32">
-              {personsList?.map(p => (
-                <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</p>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned Investigating Officer / POIC</label>
+            <input 
+              type="text" 
+              name="investigating_officer_name" 
+              placeholder="Type the name of the Officer/POIC here..." 
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" 
+            />
+          </div>
+
+          {/* NEW: SELECT INDIVIDUALS / COMPANIES (Manual Text Input) */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Individuals / Companies Involved</label>
+            <textarea 
+              name="linked_persons_names" 
+              rows={3}
+              placeholder="Type the names of individuals or companies involved..." 
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none"
+            ></textarea>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

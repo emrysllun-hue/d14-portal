@@ -1,9 +1,8 @@
+import { formatIncidentDate } from '@/lib/date-utils';
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-
-
 
 // Define the types to fix the 'any' error
 type PersonCompany = {
@@ -131,7 +130,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <Link href="/dashboard/incidents" className="text-blue-600 hover:underline text-sm mb-2 inline-block font-medium">
             ← Back to Incidents List
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">{incident.case_no}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">{incident.case_no || 'Unnamed Case'}</h1>
         </div>
         
         <div className="flex items-center gap-3">
@@ -205,8 +204,10 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
               )}
             </div>
 
-            <div className="text-gray-500 font-medium">Date & Time:</div>
-            <div className="text-gray-900">{incident.date_of_incident} {incident.time_of_incident ? `at ${incident.time_of_incident}` : ''}</div>
+<div className="text-gray-500 font-medium">Date & Time:</div>
+<div className="text-gray-900">
+  {formatIncidentDate(incident.date_of_incident, incident.time_of_incident)}
+</div>
             
             <div className="text-gray-500 font-medium">Location:</div>
             <div className="text-gray-900">{incident.location}</div>
@@ -217,13 +218,10 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
             <div className="text-gray-500 font-medium">Total Persons Involved:</div>
             <div className="text-gray-900">{incident.persons_involved}</div>
 
-            {/* NEW: Linked Individuals Display (Fixed Types) */}
             <div className="text-gray-500 font-medium">Linked Individuals:</div>
             <div className="text-gray-900 font-semibold flex flex-col gap-1">
               {linkedPersons && linkedPersons.length > 0 ? (
-                // FIXED: Replaced 'any' with 'IncidentPersonLink'
                 linkedPersons.map((lp: IncidentPersonLink) => {
-                  // Supabase returns this as an array sometimes, so we extract the first item
                   const person = Array.isArray(lp.persons_companies) ? lp.persons_companies[0] : lp.persons_companies;
                   
                   if (!person) return null;
@@ -256,9 +254,14 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
                 Last updated by: <strong className="text-gray-600">{updaterName}</strong>
               </span>
               <span>
+                {/* Forced 24-hour format explicitly */}
                 {new Date(incident.updated_at).toLocaleString('en-PH', {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
                 })}
               </span>
             </div>

@@ -128,30 +128,20 @@ export default async function IncidentsPage({
                 </tr>
               )}
               
-              {incidents?.map((inc: IncidentRecord) => (
-                <tr key={inc.id} className="hover:bg-gray-50 transition-colors">
+                          {incidents?.map((inc: IncidentRecord) => (
+                <tr key={inc.id} className="relative hover:bg-gray-50 transition-colors cursor-pointer group">
                   
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600 hover:underline">
-                    <Link href={`/dashboard/incidents/${inc.id}`}>
-                      {inc.case_no}
-                    </Link>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600 group-hover:underline">
+                    {/* INVISIBLE LINK COVERS THE WHOLE ROW */}
+                    <Link href={`/dashboard/incidents/${inc.id}`} className="absolute inset-0 z-10" />
+                    <span className="relative z-20">{inc.case_no || 'None'}</span>
                   </td>
 
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {inc.date_of_incident}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
-                    {inc.incident_types?.name}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {inc.stations?.name || 'N/A'}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-600 max-w-[250px] truncate" title={inc.location}>
-                    {inc.location}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-semibold text-gray-700">
-                    {inc.persons_involved}
-                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{inc.date_of_incident}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">{inc.incident_types?.name}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{inc.stations?.name || 'N/A'}</td>
+                  <td className="px-4 py-4 text-sm text-gray-600 max-w-[250px] truncate" title={inc.location}>{inc.location}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-semibold text-gray-700">{inc.persons_involved}</td>
                   <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-700">
                     ₱{Number(inc.estimated_value).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
