@@ -5,12 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
-// Accept categories as a prop
-export default function MobileNav({ role, categories }: { role: string, categories: { id: string, name: string }[] }) {
+// Added default value `= []` to categories
+export default function MobileNav({ role, categories = [] }: { role: string, categories?: { id: string, name: string }[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  // Removed Personnel from the main array so we can conditionally render it
   const links = [
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'All Incidents', path: '/dashboard/incidents' },
@@ -53,7 +52,6 @@ export default function MobileNav({ role, categories }: { role: string, categori
                   );
                 })}
 
-                {/* ADMIN ONLY: PERSONNEL */}
                 {role === 'admin' && (
                   <li>
                     <Link href="/dashboard/personnel" onClick={() => setIsOpen(false)} className={`block px-6 py-3 text-sm ${pathname.startsWith('/dashboard/personnel') ? 'bg-[#112a4a] border-l-4 border-blue-400 font-semibold text-white' : 'text-gray-300 hover:bg-[#112a4a] hover:text-white'}`}>
@@ -62,7 +60,6 @@ export default function MobileNav({ role, categories }: { role: string, categori
                   </li>
                 )}
 
-                {/* DYNAMIC CATEGORIES */}
                 <li className="pt-4 pb-2 px-6 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Categories</li>
                 {categories.map((cat) => (
                   <li key={cat.id}>

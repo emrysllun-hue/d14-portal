@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
-// Accept categories as a prop
-export default function Sidebar({ role, categories }: { role: string, categories: { id: string, name: string }[] }) {
+// Added default value `= []` to categories
+export default function Sidebar({ role, categories = [] }: { role: string, categories?: { id: string, name: string }[] }) {
   const pathname = usePathname();
 
   const isActive = (path: string) => {
