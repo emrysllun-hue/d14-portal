@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { loginAction } from './actions' // Import the Server Action
+import { loginAction } from './actions'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -30,7 +30,6 @@ export default function LoginPage() {
     setError(null)
     setIsLoading(true)
 
-    // Call the Server Action instead of supabase directly
     const result = await loginAction(email, password)
 
     if (result.error) {
@@ -47,7 +46,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a192f] p-4 relative overflow-hidden">
+    // Changed to flex-col to stack the card and text naturally without overlapping
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a192f] p-4 relative overflow-hidden">
       
       {/* --- CONTINUOUS RADAR BACKGROUND --- */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden opacity-60">
@@ -59,46 +59,46 @@ export default function LoginPage() {
         <div className="absolute w-[1100px] h-[1100px] rounded-full animate-radar radar-beam"></div>
       </div>
 
-      {/* --- LOGIN CARD --- */}
-      <div className="w-full max-w-lg bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-10 border-t-[6px] border-yellow-500 z-10">
+      {/* --- LOGIN CARD (Slightly smaller) --- */}
+      <div className="w-full max-w-[380px] md:max-w-md bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-6 md:p-10 border-t-[6px] border-yellow-500 z-10 relative mt-8 mb-4">
         
-        <div className="flex flex-col items-center mb-10 text-center">
+        <div className="flex flex-col items-center mb-6 md:mb-8 text-center">
           
-          {/* Logo */}
-          <div className="w-24 h-24 relative mb-6">
+          {/* Logo (Slightly smaller) */}
+          <div className="w-20 h-20 md:w-24 md:h-24 relative mb-4 md:mb-6">
             <Image 
               src="/STL.png" 
               alt="CGDSTL Logo" 
               fill
-              sizes="96px"
+              sizes="(max-width: 768px) 80px, 96px"
               priority
               className="object-contain"
             />
           </div>
           
           {/* Main Title */}
-          <h1 className="text-3xl font-extrabold text-[#0a192f] tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#0a192f] tracking-tight">
             CGDSTL <span className="text-gray-400 font-light mx-1">|</span> D-14
           </h1>
           
           {/* Subtitle */}
-          <p className="text-[11px] font-bold text-gray-500 mt-3 uppercase tracking-[0.15em] leading-relaxed max-w-[320px] mx-auto">
+          <p className="text-[10px] md:text-[11px] font-bold text-gray-500 mt-2 md:mt-3 uppercase tracking-[0.15em] leading-relaxed max-w-[280px] mx-auto">
             Deputy Chief of District Staff for<br />Maritime Security Law Enforcement
           </p>
           
           {/* Portal Access Title */}
-          <h2 className="text-2xl font-bold mt-8 text-gray-800 border-b-2 border-gray-100 pb-2 w-full">
+          <h2 className="text-xl md:text-2xl font-bold mt-6 text-gray-800 border-b-2 border-gray-100 pb-2 w-full">
             D-14 Access Portal
           </h2>
         </div>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-5">
+        <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <input
             type="email"
             placeholder="Username / Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-lg focus:outline-none focus:ring-2 focus:ring-[#0b2d6b] focus:bg-white transition-all placeholder:text-gray-400"
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 md:text-lg focus:outline-none focus:ring-2 focus:ring-[#0b2d6b] focus:bg-white transition-all placeholder:text-gray-400"
             required
             disabled={isLoading || isRedirecting}
           />
@@ -107,13 +107,13 @@ export default function LoginPage() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-lg focus:outline-none focus:ring-2 focus:ring-[#0b2d6b] focus:bg-white transition-all placeholder:text-gray-400"
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 md:text-lg focus:outline-none focus:ring-2 focus:ring-[#0b2d6b] focus:bg-white transition-all placeholder:text-gray-400"
             required
             disabled={isLoading || isRedirecting}
           />
           
           {error && (
-            <p className="text-red-600 text-sm font-semibold text-center bg-red-50 border border-red-100 p-3 rounded-lg animate-fade-in">
+            <p className="text-red-600 text-xs md:text-sm font-semibold text-center bg-red-50 border border-red-100 p-2 rounded-lg animate-fade-in">
               {error}
             </p>
           )}
@@ -121,11 +121,11 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading || isRedirecting}
-            className="w-full bg-[#0b2d6b] text-white text-lg font-bold py-4 px-4 rounded-lg hover:bg-[#092252] hover:shadow-lg transition-all duration-200 mt-4 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-3 tracking-widest"
+            className="w-full bg-[#0b2d6b] text-white text-base md:text-lg font-bold py-3 md:py-4 px-4 rounded-lg hover:bg-[#092252] hover:shadow-lg transition-all duration-200 mt-2 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-3 tracking-widest"
           >
             {isLoading && !isRedirecting ? (
               <>
-                <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 md:h-6 md:w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -137,7 +137,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 flex flex-col gap-3 text-sm text-gray-500 text-center font-medium">
+        <div className="mt-6 flex flex-col gap-2 text-xs md:text-sm text-gray-500 text-center font-medium">
           <div className="flex justify-between px-2">
             <a href="#" className="hover:text-[#0b2d6b] transition-colors">Trouble Logging In?</a>
             <a href="#" className="hover:text-[#0b2d6b] transition-colors">Forgot Access Key?</a>
@@ -145,22 +145,23 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <p className="absolute bottom-6 text-xs font-semibold tracking-wide text-blue-300 z-10">
+      {/* Warning Text - Now flows naturally below the card */}
+      <p className="text-[10px] md:text-xs font-semibold tracking-wide text-blue-300 z-10 text-center px-4 mt-2">
         This system is restricted to authorized users. Access is monitored.
       </p>
 
       {/* --- ACCESS GRANTED TRANSITION OVERLAY --- */}
       {isRedirecting && (
         <div className="absolute inset-0 bg-[#050e1a]/95 z-50 flex flex-col items-center justify-center animate-fade-in backdrop-blur-sm">
-          <div className="text-green-400 font-mono text-2xl md:text-3xl tracking-[0.3em] mb-8 animate-pulse font-bold">
+          <div className="text-green-400 font-mono text-xl md:text-3xl tracking-[0.3em] mb-8 animate-pulse font-bold">
             ACCESS GRANTED
           </div>
           
-          <div className="w-72 md:w-96 h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div className="w-64 md:w-96 h-2 bg-gray-800 rounded-full overflow-hidden">
             <div className="h-full bg-green-500 animate-load-bar shadow-[0_0_15px_rgba(34,197,94,1)]"></div>
           </div>
           
-          <div className="text-gray-400 font-mono text-sm mt-6 tracking-widest">
+          <div className="text-gray-400 font-mono text-xs md:text-sm mt-6 tracking-widest text-center px-4">
             INITIALIZING SECURE SESSION...
           </div>
         </div>
