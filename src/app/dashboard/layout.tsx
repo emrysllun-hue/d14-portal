@@ -6,6 +6,8 @@ import SessionTimeout from "@/components/layout/SessionTimeout";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 
+export const instant = false;
+
 export default async function DashboardLayout({
   children,
 }: {

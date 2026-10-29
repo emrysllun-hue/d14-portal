@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+export const instant = false;
 
 // Define a proper type to fix the 'any' errors
 type ListItem = {

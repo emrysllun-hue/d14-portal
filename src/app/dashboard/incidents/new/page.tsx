@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { verifyAdmin } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
+export const instant = false;
 
 async function submitIncident(formData: FormData) {
   'use server'

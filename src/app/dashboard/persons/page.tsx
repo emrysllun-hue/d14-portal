@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import DeletePersonButton from '@/components/DeletePersonButton'
 
-export const dynamic = 'force-dynamic'
+export const instant = false;
 
 // Server Action to delete a person/company
 async function deletePerson(formData: FormData) {

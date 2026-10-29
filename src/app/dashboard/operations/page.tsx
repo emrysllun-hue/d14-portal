@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import DeleteOperationButton from '@/components/DeleteOperationButton'
 
-export const dynamic = 'force-dynamic'
+export const instant = false;
 
 // Server Action to delete an operation
 async function deleteOperation(formData: FormData) {

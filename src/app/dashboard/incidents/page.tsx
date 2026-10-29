@@ -3,7 +3,7 @@ import Link from 'next/link'
 import IncidentFilters from '@/components/incidents/IncidentFilters'
 import { Suspense } from 'react'
 
-export const dynamic = 'force-dynamic'
+export const instant = false;
 
 type IncidentRecord = {
   id: string;

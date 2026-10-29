@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
-export const dynamic = 'force-dynamic'
+export const instant = false;
 
 // Server Action to Add a Court Proceeding
 async function addProceeding(formData: FormData) {

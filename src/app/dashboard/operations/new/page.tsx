@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
+export const instant = false;
 
 async function addOperation(formData: FormData) {
   'use server'

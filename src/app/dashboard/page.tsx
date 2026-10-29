@@ -4,6 +4,7 @@ import StatCard from '@/components/dashboard/StatCard'
 import MapWrapper from '@/components/dashboard/MapWrapper'
 import Link from 'next/link'
 
+export const instant = false;
 
 type DashboardIncident = {
   id: string;
