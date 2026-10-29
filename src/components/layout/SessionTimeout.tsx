@@ -4,8 +4,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-// 20 minutes in milliseconds (20 * 60 * 1000)
-const TIMEOUT_MS = 1200000; 
+// 15 minutes in milliseconds (15 * 60 * 1000)
+const TIMEOUT_MS = 900000; 
 
 export default function SessionTimeout() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function SessionTimeout() {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    // Set a new timer for 20 minutes
+    // Set a new timer for 15 minutes
     timeoutRef.current = setTimeout(() => {
       handleLogout();
     }, TIMEOUT_MS);
