@@ -3,6 +3,16 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { verifyAdmin } from '@/lib/auth'
+import SubmitButton from '@/components/SubmitButton'
+
+// Helper function to format time (e.g., "900" or "0900" -> "09:00")
+function formatTime(input: string | null): string | null {
+  if (!input) return null;
+  const digits = input.replace(/\D/g, ''); // Remove any non-digits
+  if (digits.length === 3) return `0${digits[0]}:${digits.slice(1)}`;
+  if (digits.length === 4) return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  return null; // Invalid format
+}
 
 async function updateIncident(formData: FormData) {
   'use server'
@@ -35,15 +45,17 @@ async function updateIncident(formData: FormData) {
     }
   }
 
-  // 2. Update the database (Using manual text inputs)
+  const rawTime = formData.get('time_of_incident') as string || null;
+
+  // 2. Update the database
   const incidentData = {
     case_no: formData.get('case_no') as string,
     incident_type_id: formData.get('incident_type_id') as string,
     station_id: formData.get('station_id') as string,
-    investigating_officer_name: formData.get('investigating_officer_name') as string || null, // <-- Manual text
-    linked_persons_names: formData.get('linked_persons_names') as string || null,             // <-- Manual text
+    investigating_officer_name: formData.get('investigating_officer_name') as string || null, 
+    linked_persons_names: formData.get('linked_persons_names') as string || null,             
     date_of_incident: formData.get('date_of_incident') as string,
-    time_of_incident: formData.get('time_of_incident') as string || null,
+    time_of_incident: formatTime(rawTime), // <-- Applies the formatter
     location: formData.get('location') as string,
     latitude: formData.get('latitude') ? Number(formData.get('latitude')) : null,
     longitude: formData.get('longitude') ? Number(formData.get('longitude')) : null,
@@ -120,17 +132,10 @@ export default async function EditIncidentPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          {/* NEW: Manual Input for Officer */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned Investigating Officer / POIC</label>
-              <input 
-                type="text" 
-                name="investigating_officer_name" 
-                defaultValue={incident.investigating_officer_name || ''} 
-                placeholder="Type the name..." 
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" 
-              />
+              <input type="text" name="investigating_officer_name" defaultValue={incident.investigating_officer_name || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
             </div>
           </div>
 
@@ -140,14 +145,12 @@ export default async function EditIncidentPage({ params }: { params: Promise<{ i
               <input type="text" name="location" required defaultValue={incident.location} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Optional - HH:mm)</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Optional)</label>
               <input 
                 type="text" 
                 name="time_of_incident" 
                 defaultValue={incident.time_of_incident ? incident.time_of_incident.slice(0, 5) : ''} 
-                placeholder="e.g., 14:30"
-                pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
-                title="Please enter time in 24-hour format (e.g., 14:30)"
+                placeholder="e.g., 0900 or 14:30"
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none" 
               />
             </div>
@@ -184,16 +187,9 @@ export default async function EditIncidentPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          {/* NEW: Manual Input for Individuals / Companies */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Individuals / Companies Involved</label>
-            <textarea 
-              name="linked_persons_names" 
-              rows={3}
-              defaultValue={incident.linked_persons_names || ''}
-              placeholder="Type the names of individuals or companies involved..." 
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none"
-            ></textarea>
+            <textarea name="linked_persons_names" rows={3} defaultValue={incident.linked_persons_names || ''} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0b2d6b] focus:outline-none"></textarea>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -226,7 +222,8 @@ export default async function EditIncidentPage({ params }: { params: Promise<{ i
 
           <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
             <Link href={`/dashboard/incidents/${incident.id}`} className="px-6 py-2.5 text-gray-600 font-semibold hover:bg-gray-100 rounded-md transition">Cancel</Link>
-            <button type="submit" className="bg-[#0b2d6b] text-white font-bold px-8 py-2.5 rounded-md hover:bg-blue-800 transition shadow-md">UPDATE RECORD</button>
+            {/* Uses the new SubmitButton component with loading state */}
+            <SubmitButton>UPDATE RECORD</SubmitButton>
           </div>
         </form>
       </div>
