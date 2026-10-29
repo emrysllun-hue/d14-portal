@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-export const instant = false;
+
 
 async function updatePersonnel(formData: FormData) {
   'use server'

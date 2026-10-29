@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 
-export const instant = false;
+
 
 async function deletePersonnel(formData: FormData) {
   'use server'

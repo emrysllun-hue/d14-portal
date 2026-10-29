@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 // FIXES VERCEL BUILD ERROR: Tells Next.js not to pre-render this dynamic page
-export const instant = false;
+
 
 // Define types to fix the 'any' error
 type JoinedIncident = {

@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import DeleteOperationButton from '@/components/DeleteOperationButton'
 
-export const instant = false;
+
 
 // Server Action to Delete the Operation
 async function deleteOperation(formData: FormData) {

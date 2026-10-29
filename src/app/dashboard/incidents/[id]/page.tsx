@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
-export const instant = false;
+
 
 // Define the types to fix the 'any' error
 type PersonCompany = {

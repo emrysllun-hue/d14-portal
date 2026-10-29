@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Fragment } from 'react'
 import ManualRecapEntry from '@/components/dashboard/ManualRecapEntry'
 
-export const instant = false;
+
 
 const getQuarter = (dateString: string) => {
   if (!dateString) return 0;

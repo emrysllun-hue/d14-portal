@@ -104,8 +104,9 @@ export default function CaseMap({ cases, operations }: { cases: MapIncident[], o
           <span className="flex items-center gap-1 text-slate-500 ml-4 border-l pl-4 border-gray-300">🚢 Operations</span>
         </div>
       </div>
-      <div className="h-[300px] md:h-[450px] w-full z-0 relative">
-        <MapContainer center={center} zoom={6} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
+    <div className="h-[300px] md:h-[450px] w-full z-0 relative">
+        {/* Added a unique key prop to prevent reuse errors */}
+        <MapContainer key="main-map" center={center} zoom={6} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
