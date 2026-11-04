@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
-// Added default value `= []` to categories
 export default function MobileNav({ role, categories = [] }: { role: string, categories?: { id: string, name: string }[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
@@ -30,9 +29,14 @@ export default function MobileNav({ role, categories = [] }: { role: string, cat
           <div className="fixed inset-0 bg-black/60" onClick={() => setIsOpen(false)}></div>
           
           <div className="relative w-64 bg-[#0a192f] h-full shadow-2xl flex flex-col animate-fade-in">
+            
+            {/* Updated Mobile Header */}
             <div className="p-4 flex justify-between items-center border-b border-blue-900">
-               <div className="w-10 h-10 relative flex-shrink-0">
-                 <Image src="/STL.png" alt="Logo" fill sizes="40px" className="object-contain" />
+               <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 relative flex-shrink-0">
+                   <Image src="/STL.png" alt="CGDSTL Logo" fill sizes="40px" className="object-contain" />
+                 </div>
+                 <h2 className="font-bold text-lg text-white tracking-wide">CGDSTL D-14</h2>
                </div>
                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">
                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>

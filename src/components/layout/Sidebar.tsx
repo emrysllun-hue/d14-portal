@@ -25,13 +25,14 @@ export default function Sidebar({ role, categories = [] }: { role: string, categ
   return (
     <aside className="w-64 bg-[#0a192f] text-white h-full overflow-y-auto flex-col hidden md:flex flex-shrink-0">
       
+      {/* Logo Area - Updated to match D-10 style */}
       <div className="p-5 flex items-center gap-3 border-b border-blue-900 flex-shrink-0">
         <div className="w-12 h-12 relative flex-shrink-0">
-           <Image src="/STL.png" alt="PCG Logo" fill sizes="48px" className="object-contain" />
+           <Image src="/STL.png" alt="CGDSTL Logo" fill sizes="48px" className="object-contain" />
         </div>
         <div>
-          <h2 className="font-bold text-[13px] leading-tight text-white mb-0.5">
-            COAST GUARD DISTRICT<br />SOUTHERN TAGALOG
+          <h2 className="font-bold text-xl text-white tracking-wide">
+            CGDSTL D-14
           </h2>
         </div>
       </div>
